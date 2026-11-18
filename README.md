@@ -14,37 +14,53 @@ Système testé : <https://www.saucedemo.com>
 
 _À compléter : stratégie de production des cas de test._
 
-Titre: Ajout d'articles dans le panier 
-
-	Given: L'utilisateur percoit le contenu de panier. Il y a 3 articles dans le panier(A,B,C). Prix 37 euro
-	When: il retire B du panier 
-	Then: le panier contient deux produit A et C seulement. Prix vaut 23 euro
-
-Titre: 
-
-    Given:
-    When: 
-    Then: 
-
-
 ## Scénarios et cas de test
 
-_À compléter : liste des scénarios et correspondance avec chaque test TypeScript._
+Chaque scénario est écrit au format Given / When / Then (état initial / action de
+l'utilisateur / résultat attendu).
+
+_À compléter : correspondance de chaque scénario avec son test TypeScript._
+
+### Tâche : gérer les articles du panier
+
+#### S1 — Ajouter un produit au panier
+
+- **Given** : l'utilisateur s'est identifié et voit la page du catalogue des produits.
+- **When** : il ajoute un produit au panier.
+- **Then** : le produit est ajouté au panier.
+
+#### S2 — Ajouter trois produits au panier
+
+- **Given** : l'utilisateur s'est identifié et voit la page du catalogue des produits.
+- **When** : il ajoute les produits « Sauce Labs Backpack », « Sauce Labs Fleece Jacket » et
+  « Sauce Labs Onesie ».
+- **Then** : les produits « Sauce Labs Backpack », « Sauce Labs Fleece Jacket » et
+  « Sauce Labs Onesie » sont dans le panier et le prix est de $95.01.
+
+#### S3 — Retirer un produit du panier
+
+- **Given** : l'utilisateur s'est identifié et voit le contenu du panier avec 3 produits
+  (A, B, C) : « Sauce Labs Backpack », « Sauce Labs Fleece Jacket » et « Sauce Labs Onesie ».
+  Le prix est de $95.01.
+- **When** : il retire B, « Sauce Labs Fleece Jacket », du panier.
+- **Then** : le panier ne contient plus que A et C, « Sauce Labs Backpack » et
+  « Sauce Labs Onesie ». Le prix est de $41.02.
 
 ## DSL de test
 
-_À compléter : actions, perceptions, correspondance avec les tâches et concepts, stratégie
-d'implémentation avec Playwright._
+_À compléter : correspondance avec les tâches et concepts, stratégie d'implémentation avec
+Playwright._
 
-Titre: Ajout d'articles dans le panier 
-Action 
-		
-	- addToCart(string productLabel)
-	- removeFromCart(string productLabel)
+### Tâche : gérer les articles du panier
 
-Perception
+Actions :
 
-	- getPerceivedProducts(): Promise<Product[]>  
+- `addToCart(productLabel: string): Promise<void>`
+- `removeFromCart(productLabel: string): Promise<void>`
+
+Perceptions :
+
+- `getPerceivedProducts(): Promise<Product[]>`
 
 ## Outillage et usage de l'IA
 
