@@ -20,6 +20,12 @@ Titre: Ajout d'articles dans le panier
 	When: il retire B du panier 
 	Then: le panier contient deux produit A et C seulement. Prix vaut 23 euro
 
+Titre: 
+
+    Given:
+    When: 
+    Then: 
+
 
 ## Scénarios et cas de test
 
@@ -29,6 +35,16 @@ _À compléter : liste des scénarios et correspondance avec chaque test TypeScr
 
 _À compléter : actions, perceptions, correspondance avec les tâches et concepts, stratégie
 d'implémentation avec Playwright._
+
+Titre: Ajout d'articles dans le panier 
+Action 
+		
+	- addToCart(string productLabel)
+	- removeFromCart(string productLabel)
+
+Perception
+
+	- getPerceivedProducts(): Promise<Product[]>  
 
 ## Outillage et usage de l'IA
 
