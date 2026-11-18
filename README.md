@@ -14,6 +14,13 @@ Système testé : <https://www.saucedemo.com>
 
 _À compléter : stratégie de production des cas de test._
 
+Titre: Ajout d'articles dans le panier 
+
+	Given: L'utilisateur percoit le contenu de panier. Il y a 3 articles dans le panier(A,B,C). Prix 37 euro
+	When: il retire B du panier 
+	Then: le panier contient deux produit A et C seulement. Prix vaut 23 euro
+
+
 ## Scénarios et cas de test
 
 _À compléter : liste des scénarios et correspondance avec chaque test TypeScript._
