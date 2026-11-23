@@ -19,7 +19,43 @@ _À compléter : stratégie de production des cas de test._
 Chaque scénario est écrit au format Given / When / Then (état initial / action de
 l'utilisateur / résultat attendu).
 
-_À compléter : correspondance de chaque scénario avec son test TypeScript._
+Chaque scénario a un test TypeScript qui porte le même numéro et le même titre, par exemple
+`test('S1 — Ajouter un produit au panier', ...)`. Dans chaque test, les étapes `Given`,
+`When` et `Then` sont des `test.step`, visibles dans le rapport de Playwright.
+
+| Scénarios | Fichier de test |
+|---|---|
+| S4–S9 | [tests/connexion.spec.ts](tests/connexion.spec.ts) |
+| S10–S12 | [tests/catalogue.spec.ts](tests/catalogue.spec.ts) |
+| S1–S3, S13–S15, S23–S25 | [tests/panier.spec.ts](tests/panier.spec.ts) |
+| S16–S21 | [tests/commande.spec.ts](tests/commande.spec.ts) |
+| S22 | [tests/deconnexion.spec.ts](tests/deconnexion.spec.ts) |
+| S26–S37 | [tests/cas-limites.spec.ts](tests/cas-limites.spec.ts) |
+| S38–S43 | [tests/comptes-defectueux.spec.ts](tests/comptes-defectueux.spec.ts) |
+
+Deux marquages de Playwright traduisent les cas particuliers :
+
+- `test.fail` pour les scénarios avec une ligne **Observé** (S26, S35, S38 à S43) : le test
+  vérifie le comportement correct, échoue à cause du défaut du site, et Playwright compte cet
+  échec comme attendu. Si le défaut est un jour corrigé, Playwright le signale.
+- `test.fixme` pour les scénarios « à décider » (S21, S37) : le test est écrit avec le
+  comportement actuel du site, mais il n'est pas lancé tant que la décision n'est pas prise.
+
+### Lancer les tests
+
+```sh
+npm install
+npm test
+npm run test:report
+```
+
+Pour voir le navigateur pendant les tests :
+
+- `npm run test:headed` ouvre Chrome et lance les tests un par un à l'écran ;
+- `npm run test:ui` ouvre l'interface de Playwright, où l'on choisit les tests à lancer et
+  où l'on revoit chaque étape.
+
+Les tests utilisent le navigateur Google Chrome installé sur le poste (`channel: 'chrome'`).
 
 ### Données de test
 
@@ -436,9 +472,8 @@ des scénarios déjà écrits avec ces comptes : chaque test doit échouer.
 - **When** : il saisit `performance_glitch_user` et `secret_sauce`, puis clique sur « Login ».
 - **Then** : comme S4, il voit la page « Products » avec 6 produits.
 - **Observé** : la page met environ 5,5 secondes à s'afficher, contre environ 0,6 seconde avec
-  `standard_user`. Les vérifications de Playwright attendent 5 secondes par défaut, donc ce
-  test peut échouer par dépassement du délai : il vérifie aussi que l'interface reste assez
-  rapide.
+  `standard_user`. Playwright attend que la page se charge, donc ce retard seul ne fait pas
+  échouer le test : il vérifie aussi que la connexion prend moins de 5 secondes.
 
 ## DSL de test
 
@@ -484,7 +519,8 @@ Actions :
 
 Perceptions :
 
-- `getPerceivedPage(): Promise<PageName>` : la page affichée.
+- `getPerceivedPage(): Promise<PageName | null>` : la page affichée, ou `null` pendant un
+  chargement.
 - `getPerceivedErrorMessage(): Promise<string | null>` : le message d'erreur affiché, ou
   `null` s'il n'y en a pas (connexion et formulaire de commande).
 - `getPerceivedAlerts(): Promise<string[]>` : les messages des alertes du navigateur apparues
@@ -588,9 +624,11 @@ ajoute `openCart()`.
   directement.
 - **Repérer les éléments comme l'utilisateur les voit** : les boutons par leur texte
   (`getByRole('button', { name: 'Add to cart' })`), les champs par leur texte d'aide
-  (`getByPlaceholder('Username')`). Quand un élément n'a pas de texte visible (pastille du
-  panier, icône d'erreur), on utilise l'attribut `data-test` du site, déclaré dans la
-  configuration avec `testIdAttribute: 'data-test'`.
+  (`getByPlaceholder('Username')`), les entrées du menu par leur texte
+  (`getByText('Logout')`). Quand un élément n'a pas de texte stable (pastille du panier,
+  titre de la page, totaux), on utilise l'attribut `data-test` du site, déclaré dans la
+  configuration avec `testIdAttribute: 'data-test'`. Les champs en erreur sont ceux que le
+  site marque en rouge (classe `error`).
 - **Un produit est identifié par son nom** : on cherche le bloc qui contient exactement ce
   nom, puis le bouton à l'intérieur de ce bloc. La même action marche donc dans le catalogue,
   sur la fiche et dans le panier.
@@ -606,4 +644,43 @@ ajoute `openCart()`.
 
 ## Outillage et usage de l'IA
 
-_À compléter : outils utilisés, prompts donnés aux LLM, utilisation d'agents._
+### Outils
+
+- [Playwright](https://playwright.dev) et TypeScript pour écrire et lancer les tests.
+- Visual Studio Code comme éditeur.
+- Claude Code (modèle Claude Opus 5.5, d'Anthropic), un assistant d'IA qui lit et modifie
+  les fichiers du projet et lance des commandes dans le terminal.
+
+### Ce qui a été fait par nous et ce qui a été fait par l'IA
+
+| Partie | Auteur |
+|---|---|
+| Scénarios S1 à S22 (Given / When / Then) | nous |
+| Scénarios S23 à S25 (retrait depuis le catalogue et la fiche) | idée de notre part, rédaction par l'IA |
+| Cas limites S26 à S43 | proposés par l'IA, puis vérifiés par l'IA sur le site avec un script Playwright |
+| Premières fonctions du DSL (`addToCart`, `removeFromCart`, `getPerceivedProducts`) | nous |
+| Reste du DSL (types, actions, perceptions, stratégie d'implémentation) | l'IA |
+| Code : configuration, classe `SauceDemo`, tests | l'IA |
+
+Pour les cas limites, l'IA a d'abord ouvert le site avec Playwright pour observer son
+comportement réel. Les lignes **Observé** des scénarios viennent de ces observations.
+
+### Prompts donnés à l'IA
+
+En substance, dans l'ordre :
+
+1. « Fais-moi juste les cas de test Given / When / Then du site avant de faire autre chose. »
+2. « On peut retirer du panier les produits achetés, mais on peut aussi les supprimer depuis la
+   page des produits avec le bouton Remove, et les boutons changent après l'ajout d'un produit
+   au panier. Je pense que ces cas sont intéressants. »
+3. « Est-ce qu'il reste des cas limites à ajouter qui ne sont pas courants ? », puis le choix
+   de les vérifier d'abord sur le site avant de les écrire.
+4. « Complète le DSL. »
+5. « Fais le code, en mentionnant que c'est fait par une IA, mais que les tests Given / When /
+   Then d'avant sont faits par nous, sauf quelques cas limites. »
+
+### Utilisation d'agents
+
+Claude Code a travaillé comme un agent : il a lancé lui-même des commandes (installation de
+Playwright, scripts d'observation du site, lancement des tests) et corrigé le code d'après
+les résultats. Aucun autre agent n'a été utilisé.

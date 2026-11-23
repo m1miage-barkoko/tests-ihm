@@ -1,0 +1,24 @@
+{
+  "name": "tests-ihm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tests end-to-end en boîte noire de SauceDemo, écrits avec un DSL de test et interprétés avec Playwright.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed --workers=1",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/m1miage-barkoko/tests-ihm.git"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
