@@ -442,19 +442,167 @@ des scénarios déjà écrits avec ces comptes : chaque test doit échouer.
 
 ## DSL de test
 
-_À compléter : correspondance avec les tâches et concepts, stratégie d'implémentation avec
-Playwright._
+Le DSL décrit ce que l'utilisateur **fait** (actions) et ce qu'il **voit** (perceptions), avec
+le vocabulaire de l'interface. Les tests n'utilisent que le DSL et ne parlent jamais de
+sélecteurs, d'URL internes ou de code HTML.
+
+### Concepts
+
+Les données échangées avec le DSL reprennent les concepts que l'utilisateur voit à l'écran.
+Les prix restent des chaînes telles qu'affichées (`"$29.99"`), ce qui permet de les comparer
+directement au texte des scénarios, y compris un prix anormal comme `"$√-1"` (S31). La
+quantité d'un produit n'est renseignée que dans le panier et le récapitulatif.
+
+```ts
+type Product = { label: string; price: string; quantity?: number };
+
+type ProductDetails = { label: string; price: string; description: string };
+
+type CustomerInfo = { firstName: string; lastName: string; postalCode: string };
+
+type Totals = { itemTotal: string; tax: string; total: string };
+
+type SortOption =
+  | 'Name (A to Z)' | 'Name (Z to A)'
+  | 'Price (low to high)' | 'Price (high to low)';
+
+type ButtonLabel = 'Add to cart' | 'Remove';
+
+type PageName =
+  | 'Login' | 'Products' | 'Product details' | 'Your Cart'
+  | 'Checkout: Your Information' | 'Checkout: Overview' | 'Checkout: Complete!';
+```
+
+### Navigation commune
+
+Actions :
+
+- `goTo(path: string): Promise<void>` : ouvre directement une adresse du site, comme si
+  l'utilisateur la tapait (S9, S22, S31, S34).
+- `reload(): Promise<void>` : recharge la page (S26, S28).
+- `goBack(): Promise<void>` : clique sur le bouton « Retour » du navigateur (S37).
+
+Perceptions :
+
+- `getPerceivedPage(): Promise<PageName>` : la page affichée.
+- `getPerceivedErrorMessage(): Promise<string | null>` : le message d'erreur affiché, ou
+  `null` s'il n'y en a pas (connexion et formulaire de commande).
+- `getPerceivedAlerts(): Promise<string[]>` : les messages des alertes du navigateur apparues
+  depuis le début du test (S42).
+
+### Tâche : se connecter
+
+Actions :
+
+- `openLoginPage(): Promise<void>`
+- `login(username: string, password: string): Promise<void>` : saisit les deux champs (une
+  chaîne vide laisse le champ vide) et clique sur « Login ».
+- `closeErrorMessage(): Promise<void>` : clique sur la croix du message d'erreur (S33).
+
+Perceptions :
+
+- `getPerceivedFieldsInError(): Promise<string[]>` : les champs marqués d'une icône rouge, par
+  exemple `['Username', 'Password']` (S33).
+
+### Tâche : consulter le catalogue
+
+Actions :
+
+- `sortBy(option: SortOption): Promise<void>`
+- `openProduct(productLabel: string): Promise<void>` : clique sur le nom du produit.
+- `backToProducts(): Promise<void>` : clique sur « Back to products ».
+
+Perceptions :
+
+- `getPerceivedProducts(): Promise<Product[]>` : les produits de la liste affichée, dans
+  l'ordre de l'écran. Sert pour le catalogue, le panier et le récapitulatif de commande.
+- `getPerceivedSortOption(): Promise<SortOption>` : le tri affiché (S30).
+- `getPerceivedProductDetails(): Promise<ProductDetails>` : la fiche ouverte (S12, S31, S40).
 
 ### Tâche : gérer les articles du panier
 
 Actions :
 
-- `addToCart(productLabel: string): Promise<void>`
-- `removeFromCart(productLabel: string): Promise<void>`
+- `addToCart(productLabel: string): Promise<void>` : clique sur « Add to cart » pour ce
+  produit, dans le catalogue ou sur sa fiche.
+- `removeFromCart(productLabel: string): Promise<void>` : clique sur « Remove » pour ce
+  produit, dans le catalogue, sur sa fiche ou dans le panier.
+- `doubleClickAddToCart(productLabel: string): Promise<void>` : double-clique sur « Add to
+  cart » (S29).
+- `openCart(): Promise<void>` : clique sur l'icône du panier.
+- `continueShopping(): Promise<void>` : clique sur « Continue Shopping ».
+- `resetAppState(): Promise<void>` : ouvre le menu et clique sur « Reset App State » (S26).
 
 Perceptions :
 
-- `getPerceivedProducts(): Promise<Product[]>`
+- `getPerceivedProducts(): Promise<Product[]>` : dans le panier, les produits avec leur
+  quantité.
+- `getPerceivedCartBadge(): Promise<number | null>` : le nombre sur la pastille du panier, ou
+  `null` s'il n'y a pas de pastille.
+- `getPerceivedButtonLabel(productLabel: string): Promise<ButtonLabel>` : le texte du bouton
+  sous ce produit dans le catalogue, ou sur sa fiche.
+
+### Tâche : passer une commande
+
+Actions :
+
+- `checkout(): Promise<void>` : clique sur « Checkout » depuis le panier.
+- `fillCustomerInfo(info: CustomerInfo): Promise<void>` : remplit les trois champs (une chaîne
+  vide laisse le champ vide).
+- `continueCheckout(): Promise<void>` : clique sur « Continue ».
+- `cancelCheckout(): Promise<void>` : clique sur « Cancel ».
+- `finishCheckout(): Promise<void>` : clique sur « Finish ».
+
+Perceptions :
+
+- `getPerceivedCustomerInfo(): Promise<CustomerInfo>` : le contenu des trois champs (S41).
+- `getPerceivedTotals(): Promise<Totals>` : « Item total », « Tax » et « Total » du
+  récapitulatif.
+- `getPerceivedOrderConfirmation(): Promise<string>` : le message de fin de commande, par
+  exemple « Thank you for your order! ».
+
+### Tâche : se déconnecter
+
+Actions :
+
+- `logout(): Promise<void>` : ouvre le menu et clique sur « Logout ».
+
+### Correspondance avec les scénarios
+
+| Tâche | Scénarios | Actions principales | Perceptions principales |
+|---|---|---|---|
+| Se connecter | S4–S9, S32–S34, S43 | `openLoginPage`, `login`, `closeErrorMessage`, `goTo` | `getPerceivedPage`, `getPerceivedErrorMessage`, `getPerceivedFieldsInError` |
+| Consulter le catalogue | S10–S12, S30, S31, S39, S40, S42 | `sortBy`, `openProduct`, `backToProducts`, `goTo` | `getPerceivedProducts`, `getPerceivedSortOption`, `getPerceivedProductDetails`, `getPerceivedAlerts` |
+| Gérer les articles du panier | S1–S3, S13–S15, S23–S29, S38 | `addToCart`, `removeFromCart`, `doubleClickAddToCart`, `openCart`, `continueShopping`, `resetAppState`, `reload` | `getPerceivedProducts`, `getPerceivedCartBadge`, `getPerceivedButtonLabel` |
+| Passer une commande | S16–S21, S35–S37, S41 | `checkout`, `fillCustomerInfo`, `continueCheckout`, `cancelCheckout`, `finishCheckout`, `goBack` | `getPerceivedTotals`, `getPerceivedOrderConfirmation`, `getPerceivedCustomerInfo`, `getPerceivedErrorMessage` |
+| Se déconnecter | S22, S27 | `logout`, `login`, `goTo` | `getPerceivedPage`, `getPerceivedErrorMessage`, `getPerceivedCartBadge` |
+
+Le **Given** d'un scénario est construit avec les mêmes actions. Par exemple, « son panier
+contient A, B et C » s'écrit `login(...)` puis `addToCart` trois fois, et « voit son panier »
+ajoute `openCart()`.
+
+### Stratégie d'implémentation avec Playwright
+
+- **Une classe `SauceDemo`** reçoit la `Page` de Playwright et implémente toutes les actions
+  et perceptions. Les tests créent une instance de cette classe et n'utilisent jamais `page`
+  directement.
+- **Repérer les éléments comme l'utilisateur les voit** : les boutons par leur texte
+  (`getByRole('button', { name: 'Add to cart' })`), les champs par leur texte d'aide
+  (`getByPlaceholder('Username')`). Quand un élément n'a pas de texte visible (pastille du
+  panier, icône d'erreur), on utilise l'attribut `data-test` du site, déclaré dans la
+  configuration avec `testIdAttribute: 'data-test'`.
+- **Un produit est identifié par son nom** : on cherche le bloc qui contient exactement ce
+  nom, puis le bouton à l'intérieur de ce bloc. La même action marche donc dans le catalogue,
+  sur la fiche et dans le panier.
+- **Les perceptions ne vérifient rien** : elles lisent l'écran et renvoient des données. Les
+  vérifications sont dans les tests, avec `expect.poll(() => dsl.getPerceivedCartBadge())`,
+  qui relit l'écran jusqu'à obtenir la valeur attendue ou jusqu'au délai maximal. C'est ce qui
+  gère les pages lentes comme celle de `performance_glitch_user` (S43).
+- **Les alertes du navigateur** sont enregistrées dès la création de la classe, puis fermées,
+  pour que le test continue et que `getPerceivedAlerts()` puisse les lire (S42).
+- **Configuration** (`playwright.config.ts`) : `baseURL` vaut `https://www.saucedemo.com`, et
+  `channel: 'chrome'` fait utiliser Google Chrome, car le Chromium fourni par Playwright est
+  bloqué sur un de nos postes.
 
 ## Outillage et usage de l'IA
 
