@@ -1,6 +1,6 @@
 export type Product = { label: string; price: string; quantity?: number };
 
-export type ProductDetails = { label: string; price: string; description: string };
+export type ProductDetails = { label: string; price: string; description: string | null };
 
 export type CustomerInfo = { firstName: string; lastName: string; postalCode: string };
 

@@ -1,115 +1,192 @@
 import { test, expect } from './support/fixtures';
+import { A_CONFIRMER, forEachAccount } from './support/accounts';
 import {
   addAllToCart,
   backpack,
+  catalogue,
   fleeceJacket,
   inCart,
   jeanDupont,
-  loggedInAs,
   onesie,
 } from './support/data';
+import type { SauceDemo } from '../src/dsl/SauceDemo';
+import type { CustomerInfo, Product, Totals } from '../src/dsl/types';
 
-test.describe('Tâche : passer une commande', () => {
-  test.beforeEach(async ({ app }) => {
-    await loggedInAs(app);
-    await expect.poll(() => app.getPerceivedPage()).toBe('Products');
-  });
+async function openCheckoutForm(app: SauceDemo, ...products: Product[]): Promise<void> {
+  await addAllToCart(app, ...products);
+  await app.openCart();
+  await app.checkout();
+  await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Your Information');
+}
 
-  test('S16 — Commande complète de trois produits', async ({ app }) => {
-    await test.step('Given', async () => {
-      await addAllToCart(app, backpack, fleeceJacket, onesie);
-      await expect.poll(() => app.getPerceivedCartBadge()).toBe(3);
-    });
-    await test.step('When', async () => {
-      await app.openCart();
-      await app.checkout();
-      await app.fillCustomerInfo(jeanDupont);
-      await app.continueCheckout();
-    });
-    await test.step('Then', async () => {
-      await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
-      expect(await app.getPerceivedTotals()).toEqual({
-        itemTotal: '$87.97',
-        tax: '$7.04',
-        total: '$95.01',
+async function reachOverview(app: SauceDemo, ...products: Product[]): Promise<void> {
+  await openCheckoutForm(app, ...products);
+  await app.fillCustomerInfo(jeanDupont);
+  await app.continueCheckout();
+  await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
+}
+
+test.describe('CMD : passer une commande', () => {
+  forEachAccount(() => {
+    const missingFields: { id: string; title: string; info: CustomerInfo; message: string }[] = [
+      { id: 'CMD1', title: 'Prénom vide', info: { ...jeanDupont, firstName: '' }, message: 'Error: First Name is required' },
+      { id: 'CMD2', title: 'Le prénom est contrôlé en premier', info: { firstName: '', lastName: '', postalCode: '' }, message: 'Error: First Name is required' },
+      { id: 'CMD3', title: 'Nom vide', info: { ...jeanDupont, lastName: '' }, message: 'Error: Last Name is required' },
+      { id: 'CMD4', title: 'Le nom est contrôlé avant le code postal', info: { ...jeanDupont, lastName: '', postalCode: '' }, message: 'Error: Last Name is required' },
+      { id: 'CMD5', title: 'Code postal vide', info: { ...jeanDupont, postalCode: '' }, message: 'Error: Postal Code is required' },
+    ];
+
+    for (const { id, title, info, message } of missingFields) {
+      test(`${id} — ${title}`, async ({ app }) => {
+        await test.step('Given', async () => {
+          await openCheckoutForm(app, backpack);
+        });
+        await test.step('When', async () => {
+          await app.fillCustomerInfo(info);
+          await app.continueCheckout();
+        });
+        await test.step('Then', async () => {
+          await expect.poll(() => app.getPerceivedErrorMessage()).toBe(message);
+          expect(await app.getPerceivedPage()).toBe('Checkout: Your Information');
+        });
       });
-    });
-    await test.step('When', async () => {
-      await app.finishCheckout();
-    });
-    await test.step('Then', async () => {
-      await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
-      expect(await app.getPerceivedOrderConfirmation()).toBe('Thank you for your order!');
-      expect(await app.getPerceivedCartBadge()).toBeNull();
-    });
-  });
+    }
 
-  const missingFields = [
-    { id: 'S17', title: 'Commande sans prénom (erreur)', info: { ...jeanDupont, firstName: '' }, message: 'Error: First Name is required' },
-    { id: 'S18', title: 'Commande sans nom (erreur)', info: { ...jeanDupont, lastName: '' }, message: 'Error: Last Name is required' },
-    { id: 'S19', title: 'Commande sans code postal (erreur)', info: { ...jeanDupont, postalCode: '' }, message: 'Error: Postal Code is required' },
-  ];
+    const acceptedForms: { id: string; title: string; info: CustomerInfo; aConfirmer: boolean }[] = [
+      { id: 'CMD6', title: 'Limite : un seul caractère', info: { firstName: 'J', lastName: 'D', postalCode: '3' }, aConfirmer: false },
+      { id: 'CMD7', title: 'Espaces seuls dans le prénom', info: { ...jeanDupont, firstName: '   ' }, aConfirmer: true },
+      { id: 'CMD8', title: 'Code postal non numérique', info: { ...jeanDupont, postalCode: 'abc' }, aConfirmer: true },
+    ];
 
-  for (const { id, title, info, message } of missingFields) {
-    test(`${id} — ${title}`, async ({ app }) => {
-      await test.step('Given', async () => {
-        await app.addToCart(backpack.label);
+    for (const { id, title, info, aConfirmer } of acceptedForms) {
+      test(`${id} — ${title}`, aConfirmer ? A_CONFIRMER : {}, async ({ app }) => {
+        await test.step('Given', async () => {
+          await openCheckoutForm(app, backpack);
+        });
+        await test.step('When', async () => {
+          await app.fillCustomerInfo(info);
+          await app.continueCheckout();
+        });
+        await test.step('Then', async () => {
+          await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
+        });
+      });
+    }
+
+    const totals: { id: string; title: string; cart: Product[]; expected: Totals; listed: boolean }[] = [
+      { id: 'CMD9', title: 'Limite : un produit, le moins cher', cart: [onesie], expected: { itemTotal: '$7.99', tax: '$0.64', total: '$8.63' }, listed: false },
+      { id: 'CMD10', title: 'Trois produits', cart: [backpack, fleeceJacket, onesie], expected: { itemTotal: '$87.97', tax: '$7.04', total: '$95.01' }, listed: true },
+      { id: 'CMD11', title: 'Limite : panier plein', cart: catalogue, expected: { itemTotal: '$129.94', tax: '$10.40', total: '$140.34' }, listed: false },
+      { id: 'CMD12', title: 'Arrondi de la taxe', cart: [fleeceJacket], expected: { itemTotal: '$49.99', tax: '$4.00', total: '$53.99' }, listed: false },
+    ];
+
+    for (const { id, title, cart, expected, listed } of totals) {
+      test(`${id} — ${title}`, async ({ app }) => {
+        await test.step('Given', async () => {
+          await addAllToCart(app, ...cart);
+        });
+        await test.step('When', async () => {
+          await app.openCart();
+          await app.checkout();
+          await app.fillCustomerInfo(jeanDupont);
+          await app.continueCheckout();
+        });
+        await test.step('Then', async () => {
+          await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
+          if (listed) expect(await app.getPerceivedProducts()).toEqual(inCart(...cart));
+          expect(await app.getPerceivedTotals()).toEqual(expected);
+        });
+      });
+    }
+
+    test('CMD13 — Limite : panier vide', A_CONFIRMER, async ({ app }) => {
+      await test.step('When', async () => {
         await app.openCart();
         await app.checkout();
-        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Your Information');
-      });
-      await test.step('When', async () => {
-        await app.fillCustomerInfo(info);
+        await app.fillCustomerInfo(jeanDupont);
         await app.continueCheckout();
       });
       await test.step('Then', async () => {
-        await expect.poll(() => app.getPerceivedErrorMessage()).toBe(message);
-        expect(await app.getPerceivedPage()).toBe('Checkout: Your Information');
+        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
+        expect(await app.getPerceivedTotals()).toEqual({ itemTotal: '$0', tax: '$0.00', total: '$0.00' });
+      });
+      await test.step('When', async () => {
+        await app.finishCheckout();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
       });
     });
-  }
 
-  test('S20 — Annuler la commande au récapitulatif', async ({ app }) => {
-    await test.step('Given', async () => {
-      await addAllToCart(app, backpack, onesie);
-      await app.openCart();
-      await app.checkout();
-      await app.fillCustomerInfo(jeanDupont);
-      await app.continueCheckout();
-      await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
-      expect(await app.getPerceivedTotals()).toEqual({
-        itemTotal: '$37.98',
-        tax: '$3.04',
-        total: '$41.02',
+    test('CMD14 — Fin de commande, le panier est vidé', async ({ app }) => {
+      await test.step('Given', async () => {
+        await reachOverview(app, backpack, fleeceJacket, onesie);
+      });
+      await test.step('When', async () => {
+        await app.finishCheckout();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
+        expect(await app.getPerceivedOrderConfirmation()).toBe('Thank you for your order!');
+      });
+      await test.step('When', async () => {
+        await app.backHome();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Products');
+        expect(await app.getPerceivedCartBadge()).toBeNull();
       });
     });
-    await test.step('When', async () => {
-      await app.cancelCheckout();
-    });
-    await test.step('Then', async () => {
-      await expect.poll(() => app.getPerceivedPage()).toBe('Products');
-      expect(await app.getPerceivedCartBadge()).toBe(2);
-      await app.openCart();
-      await expect.poll(() => app.getPerceivedProducts()).toEqual(inCart(backpack, onesie));
-    });
-  });
 
-  test.fixme('S21 — Commande avec un panier vide (cas limite)', async ({ app }) => {
-    await test.step('Given', async () => {
-      expect(await app.getPerceivedCartBadge()).toBeNull();
+    test("CMD15 — Annuler à l'étape 1", async ({ app }) => {
+      await test.step('Given', async () => {
+        await openCheckoutForm(app, backpack);
+      });
+      await test.step('When', async () => {
+        await app.cancelCheckout();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Your Cart');
+        expect(await app.getPerceivedProducts()).toEqual(inCart(backpack));
+      });
     });
-    await test.step('When', async () => {
-      await app.openCart();
-      await app.checkout();
-      await app.fillCustomerInfo(jeanDupont);
-      await app.continueCheckout();
+
+    test("CMD16 — Annuler à l'étape 2", async ({ app }) => {
+      await test.step('Given', async () => {
+        await reachOverview(app, backpack, onesie);
+        expect(await app.getPerceivedTotals()).toEqual({ itemTotal: '$37.98', tax: '$3.04', total: '$41.02' });
+      });
+      await test.step('When', async () => {
+        await app.cancelCheckout();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Products');
+        expect(await app.getPerceivedCartBadge()).toBe(2);
+        await app.openCart();
+        await expect.poll(() => app.getPerceivedProducts()).toEqual(inCart(backpack, onesie));
+      });
     });
-    await test.step('Then', async () => {
-      await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
-      expect(await app.getPerceivedTotals()).toEqual({
-        itemTotal: '$0',
-        tax: '$0.00',
-        total: '$0.00',
+
+    test('CMD17 — Revenir en arrière après une commande', A_CONFIRMER, async ({ app }) => {
+      await test.step('Given', async () => {
+        await reachOverview(app, backpack);
+        await app.finishCheckout();
+        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
+      });
+      await test.step('When', async () => {
+        await app.goBack();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
+        expect(await app.getPerceivedProducts()).toEqual([]);
+        expect((await app.getPerceivedTotals()).total).toBe('$0.00');
+      });
+      await test.step('When', async () => {
+        await app.finishCheckout();
+      });
+      await test.step('Then', async () => {
+        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
+        expect(await app.getPerceivedOrderConfirmation()).toBe('Thank you for your order!');
       });
     });
   });

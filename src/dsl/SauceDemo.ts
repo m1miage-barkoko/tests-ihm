@@ -106,10 +106,11 @@ export class SauceDemo {
 
   async getPerceivedProductDetails(): Promise<ProductDetails> {
     const item = this.page.getByTestId('inventory-item');
+    const description = item.getByTestId('inventory-item-desc');
     return {
       label: (await item.getByTestId('inventory-item-name').innerText()).trim(),
       price: (await item.getByTestId('inventory-item-price').innerText()).trim(),
-      description: (await item.getByTestId('inventory-item-desc').innerText()).trim(),
+      description: (await description.count()) > 0 ? (await description.innerText()).trim() : null,
     };
   }
 
@@ -172,12 +173,8 @@ export class SauceDemo {
     await this.page.getByRole('button', { name: 'Finish' }).click();
   }
 
-  async getPerceivedCustomerInfo(): Promise<CustomerInfo> {
-    return {
-      firstName: await this.page.getByPlaceholder('First Name').inputValue(),
-      lastName: await this.page.getByPlaceholder('Last Name').inputValue(),
-      postalCode: await this.page.getByPlaceholder('Zip/Postal Code').inputValue(),
-    };
+  async backHome(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Back Home' }).click();
   }
 
   async getPerceivedTotals(): Promise<Totals> {
