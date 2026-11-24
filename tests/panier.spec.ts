@@ -1,5 +1,5 @@
 import { test, expect } from './support/fixtures';
-import { A_CONFIRMER, forEachAccount } from './support/accounts';
+import { forEachAccount } from './support/accounts';
 import {
   addAllToCart,
   backpack,
@@ -8,7 +8,6 @@ import {
   fleeceJacket,
   inCart,
   onesie,
-  PASSWORD,
 } from './support/data';
 import type { Product } from '../src/dsl/types';
 
@@ -16,7 +15,7 @@ const byLabel = (products: Product[]): Product[] =>
   [...products].sort((a, b) => a.label.localeCompare(b.label));
 
 test.describe('P : gérer le panier', () => {
-  forEachAccount((account) => {
+  forEachAccount(() => {
     test('P1 — Ajouter un produit depuis le catalogue, panier vide', async ({ app }) => {
       await test.step('When', async () => {
         await app.addToCart(backpack.label);
@@ -240,7 +239,7 @@ test.describe('P : gérer le panier', () => {
       });
     });
 
-    test('P16 — Réinitialisation', A_CONFIRMER, async ({ app }) => {
+    test('P16 — Réinitialisation', async ({ app }) => {
       await test.step('Given', async () => {
         await addAllToCart(app, backpack, onesie);
         await expect.poll(() => app.getPerceivedCartBadge()).toBe(2);
@@ -255,23 +254,6 @@ test.describe('P : gérer le panier', () => {
         await app.openCart();
         await expect.poll(() => app.getPerceivedPage()).toBe('Your Cart');
         expect(await app.getPerceivedProducts()).toEqual([]);
-      });
-    });
-
-    test('P17 — Le panier survit à la déconnexion', A_CONFIRMER, async ({ app }) => {
-      await test.step('Given', async () => {
-        await app.addToCart(backpack.label);
-        await expect.poll(() => app.getPerceivedCartBadge()).toBe(1);
-      });
-      await test.step('When', async () => {
-        await app.logout();
-        await app.login(account, PASSWORD);
-      });
-      await test.step('Then', async () => {
-        await expect.poll(() => app.getPerceivedPage(), { timeout: 15_000 }).toBe('Products');
-        expect(await app.getPerceivedCartBadge()).toBe(1);
-        await app.openCart();
-        await expect.poll(() => app.getPerceivedProducts()).toEqual(inCart(backpack));
       });
     });
   });

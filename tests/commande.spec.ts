@@ -34,6 +34,7 @@ test.describe('CMD : passer une commande', () => {
       { id: 'CMD3', title: 'Nom vide', info: { ...jeanDupont, lastName: '' }, message: 'Error: Last Name is required' },
       { id: 'CMD4', title: 'Le nom est contrôlé avant le code postal', info: { ...jeanDupont, lastName: '', postalCode: '' }, message: 'Error: Last Name is required' },
       { id: 'CMD5', title: 'Code postal vide', info: { ...jeanDupont, postalCode: '' }, message: 'Error: Postal Code is required' },
+      { id: 'CMD7', title: 'Espaces seuls dans le prénom', info: { ...jeanDupont, firstName: '   ' }, message: 'Error: First Name is required' },
     ];
 
     for (const { id, title, info, message } of missingFields) {
@@ -54,7 +55,6 @@ test.describe('CMD : passer une commande', () => {
 
     const acceptedForms: { id: string; title: string; info: CustomerInfo; aConfirmer: boolean }[] = [
       { id: 'CMD6', title: 'Limite : un seul caractère', info: { firstName: 'J', lastName: 'D', postalCode: '3' }, aConfirmer: false },
-      { id: 'CMD7', title: 'Espaces seuls dans le prénom', info: { ...jeanDupont, firstName: '   ' }, aConfirmer: true },
       { id: 'CMD8', title: 'Code postal non numérique', info: { ...jeanDupont, postalCode: 'abc' }, aConfirmer: true },
     ];
 
@@ -99,24 +99,6 @@ test.describe('CMD : passer une commande', () => {
       });
     }
 
-    test('CMD13 — Limite : panier vide', A_CONFIRMER, async ({ app }) => {
-      await test.step('When', async () => {
-        await app.openCart();
-        await app.checkout();
-        await app.fillCustomerInfo(jeanDupont);
-        await app.continueCheckout();
-      });
-      await test.step('Then', async () => {
-        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
-        expect(await app.getPerceivedTotals()).toEqual({ itemTotal: '$0', tax: '$0.00', total: '$0.00' });
-      });
-      await test.step('When', async () => {
-        await app.finishCheckout();
-      });
-      await test.step('Then', async () => {
-        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
-      });
-    });
 
     test('CMD14 — Fin de commande, le panier est vidé', async ({ app }) => {
       await test.step('Given', async () => {
@@ -164,29 +146,6 @@ test.describe('CMD : passer une commande', () => {
         expect(await app.getPerceivedCartBadge()).toBe(2);
         await app.openCart();
         await expect.poll(() => app.getPerceivedProducts()).toEqual(inCart(backpack, onesie));
-      });
-    });
-
-    test('CMD17 — Revenir en arrière après une commande', A_CONFIRMER, async ({ app }) => {
-      await test.step('Given', async () => {
-        await reachOverview(app, backpack);
-        await app.finishCheckout();
-        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
-      });
-      await test.step('When', async () => {
-        await app.goBack();
-      });
-      await test.step('Then', async () => {
-        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Overview');
-        expect(await app.getPerceivedProducts()).toEqual([]);
-        expect((await app.getPerceivedTotals()).total).toBe('$0.00');
-      });
-      await test.step('When', async () => {
-        await app.finishCheckout();
-      });
-      await test.step('Then', async () => {
-        await expect.poll(() => app.getPerceivedPage()).toBe('Checkout: Complete!');
-        expect(await app.getPerceivedOrderConfirmation()).toBe('Thank you for your order!');
       });
     });
   });

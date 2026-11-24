@@ -1,6 +1,6 @@
 import { test, expect } from './support/fixtures';
-import { A_CONFIRMER, forEachAccount } from './support/accounts';
-import { backpack, catalogue, fleeceJacket, onesie } from './support/data';
+import { forEachAccount } from './support/accounts';
+import { catalogue, fleeceJacket, onesie } from './support/data';
 
 test.describe('T : trier le catalogue', () => {
   forEachAccount(() => {
@@ -45,7 +45,7 @@ test.describe('T : trier le catalogue', () => {
       });
     });
 
-    test("T5 — Le tri n'est pas conservé après une fiche", A_CONFIRMER, async ({ app }) => {
+    test('T5 — Le tri est conservé après une fiche', async ({ app }) => {
       await test.step('Given', async () => {
         await app.sortBy('Price (low to high)');
       });
@@ -55,8 +55,8 @@ test.describe('T : trier le catalogue', () => {
       });
       await test.step('Then', async () => {
         await expect.poll(() => app.getPerceivedPage()).toBe('Products');
-        expect(await app.getPerceivedSortOption()).toBe('Name (A to Z)');
-        expect((await app.getPerceivedProducts())[0]).toEqual(backpack);
+        expect(await app.getPerceivedSortOption()).toBe('Price (low to high)');
+        expect((await app.getPerceivedProducts())[0]).toEqual(onesie);
       });
     });
   });

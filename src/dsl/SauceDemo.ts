@@ -38,10 +38,6 @@ export class SauceDemo {
     await this.page.reload();
   }
 
-  async goBack(): Promise<void> {
-    await this.page.goBack();
-  }
-
   async getPerceivedPage(): Promise<PageName | null> {
     if (await this.page.getByRole('button', { name: 'Login' }).isVisible()) return 'Login';
     if (await this.page.getByRole('button', { name: 'Back to products' }).isVisible()) {
@@ -96,8 +92,18 @@ export class SauceDemo {
   }
 
   async getPerceivedProducts(): Promise<Product[]> {
-    const items = await this.page.getByTestId('inventory-item').all();
-    return Promise.all(items.map((item) => this.readProduct(item)));
+    // Lecture en une seule fois : lue produit par produit, la liste peut changer de page en
+    // cours de lecture et bloquer expect.poll au-delà de son délai.
+    return this.page.getByTestId('inventory-item').evaluateAll((items) =>
+      items.map((item) => {
+        const text = (testId: string): string =>
+          item.querySelector(`[data-test="${testId}"]`)?.textContent?.trim() ?? '';
+        const product: Product = { label: text('inventory-item-name'), price: text('inventory-item-price') };
+        const quantity = item.querySelector('[data-test="item-quantity"]');
+        if (quantity) product.quantity = Number(quantity.textContent);
+        return product;
+      }),
+    );
   }
 
   async getPerceivedSortOption(): Promise<SortOption> {
@@ -206,16 +212,6 @@ export class SauceDemo {
 
   private productButton(productLabel: string, label: ButtonLabel): Locator {
     return this.product(productLabel).getByRole('button', { name: label, exact: true });
-  }
-
-  private async readProduct(item: Locator): Promise<Product> {
-    const product: Product = {
-      label: (await item.getByTestId('inventory-item-name').innerText()).trim(),
-      price: (await item.getByTestId('inventory-item-price').innerText()).trim(),
-    };
-    const quantity = item.getByTestId('item-quantity');
-    if ((await quantity.count()) > 0) product.quantity = Number(await quantity.innerText());
-    return product;
   }
 
   private async amount(testId: string): Promise<string> {
