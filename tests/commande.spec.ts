@@ -1,5 +1,5 @@
 import { test, expect } from './support/fixtures';
-import { A_CONFIRMER, forEachAccount } from './support/accounts';
+import { forEachAccount } from './support/accounts';
 import {
   addAllToCart,
   backpack,
@@ -53,13 +53,13 @@ test.describe('CMD : passer une commande', () => {
       });
     }
 
-    const acceptedForms: { id: string; title: string; info: CustomerInfo; aConfirmer: boolean }[] = [
-      { id: 'CMD6', title: 'Limite : un seul caractère', info: { firstName: 'J', lastName: 'D', postalCode: '3' }, aConfirmer: false },
-      { id: 'CMD8', title: 'Code postal non numérique', info: { ...jeanDupont, postalCode: 'abc' }, aConfirmer: true },
+    const acceptedForms: { id: string; title: string; info: CustomerInfo }[] = [
+      { id: 'CMD6', title: 'Limite : un seul caractère', info: { firstName: 'J', lastName: 'D', postalCode: '3' } },
+      { id: 'CMD8', title: 'Code postal non numérique', info: { ...jeanDupont, postalCode: 'abc' } },
     ];
 
-    for (const { id, title, info, aConfirmer } of acceptedForms) {
-      test(`${id} — ${title}`, aConfirmer ? A_CONFIRMER : {}, async ({ app }) => {
+    for (const { id, title, info } of acceptedForms) {
+      test(`${id} — ${title}`, async ({ app }) => {
         await test.step('Given', async () => {
           await openCheckoutForm(app, backpack);
         });
