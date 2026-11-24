@@ -43,16 +43,15 @@ export class SauceDemo {
     if (await this.page.getByRole('button', { name: 'Back to products' }).isVisible()) {
       return 'Product details';
     }
-    const title = this.page.getByTestId('title');
-    if (!(await title.isVisible())) return null;
-    const text = (await title.innerText()).trim();
-    return TITLED_PAGES.find((name) => name === text) ?? null;
+    // allInnerTexts n'attend pas l'élément : si la page change pendant la lecture, on obtient
+    // une liste vide au lieu de bloquer expect.poll jusqu'à son délai.
+    const [text] = await this.page.getByTestId('title').allInnerTexts();
+    return TITLED_PAGES.find((name) => name === text?.trim()) ?? null;
   }
 
   async getPerceivedErrorMessage(): Promise<string | null> {
-    const error = this.page.getByTestId('error');
-    if ((await error.count()) === 0) return null;
-    return (await error.innerText()).trim();
+    const [text] = await this.page.getByTestId('error').allInnerTexts();
+    return text === undefined ? null : text.trim();
   }
 
   async getPerceivedAlerts(): Promise<string[]> {
@@ -147,9 +146,8 @@ export class SauceDemo {
   }
 
   async getPerceivedCartBadge(): Promise<number | null> {
-    const badge = this.page.getByTestId('shopping-cart-badge');
-    if ((await badge.count()) === 0) return null;
-    return Number(await badge.innerText());
+    const [text] = await this.page.getByTestId('shopping-cart-badge').allInnerTexts();
+    return text === undefined ? null : Number(text);
   }
 
   async getPerceivedButtonLabel(productLabel: string): Promise<ButtonLabel> {
