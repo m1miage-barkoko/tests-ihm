@@ -38,8 +38,34 @@ Les tests sont en boîte noire : on part de ce que le site affiche, pas de son c
    `standard_user` et `performance_glitch_user`, sauf les tests qui révèlent un défaut du site.
    Les tests doivent échouer avec les comptes défectueux.
 8. Arrêt. On s'arrête quand chaque classe et chaque limite est couverte. Quand le résultat
-   attendu n'est pas spécifié et que nous ne savons pas le trancher, le scénario est marqué
-   « à confirmer » avec le comportement actuel (voir « Ambiguïtés de la spécification »).
+   attendu n'est pas spécifié, la référence est le comportement de `standard_user`, sauf pour
+   les cas que nous avons tranchés autrement (voir « Défauts du site »).
+
+## Glossaire
+
+Chaque objet du site a un seul nom, utilisé dans les scénarios, dans les tests et dans le DSL.
+
+| Terme | Sur le site | Dans le DSL |
+|---|---|---|
+| Compte | nom d'utilisateur saisi sur la page de connexion, par exemple `standard_user` | `login(username, password)` |
+| Compte défectueux | `problem_user`, `error_user` et `visual_user`, fournis par le site avec des défauts volontaires | `ACCOUNTS` |
+| Page de connexion | page avec les champs « Username », « Password » et le bouton « Login » | `'Login'` |
+| Page protégée | page accessible seulement après la connexion | `goTo(path)` |
+| Catalogue | page « Products » qui liste les 6 produits | `'Products'` |
+| Produit | un article du catalogue, identifié par son label et son prix | `Product` |
+| Label | nom du produit, par exemple « Sauce Labs Backpack » | `Product.label` |
+| Prix | prix affiché, par exemple « $29.99 » | `Product.price` |
+| Tri | liste déroulante du catalogue et ses 4 options | `SortOption`, `sortBy` |
+| Fiche | page d'un produit, avec le bouton « Back to products » | `'Product details'`, `openProduct` |
+| Bouton du produit | « Add to cart » ou « Remove », sous le produit ou sur sa fiche | `ButtonLabel`, `getPerceivedButtonLabel` |
+| Pastille | rond rouge avec un nombre sur l'icône du panier : le nombre de produits dans le panier, absente si le panier est vide | `getPerceivedCartBadge` |
+| Panier | page « Your Cart », avec la quantité et le prix de chaque produit | `'Your Cart'`, `openCart` |
+| Menu | bouton en haut à gauche, avec « Logout » et « Reset App State » | `logout`, `resetAppState` |
+| Formulaire de commande | page « Checkout: Your Information » (prénom, nom, code postal) | `CustomerInfo`, `fillCustomerInfo` |
+| Récapitulatif | page « Checkout: Overview » avec « Item total », « Tax » et « Total » | `Totals`, `getPerceivedTotals` |
+| Fin de commande | page « Checkout: Complete! » avec « Thank you for your order! » | `'Checkout: Complete!'` |
+| Message d'erreur | texte d'erreur affiché à la connexion, sur une page protégée ou dans le formulaire | `getPerceivedErrorMessage` |
+| Défaut du site | test qui échoue avec tous les comptes, y compris `standard_user` | |
 
 ## Scénarios et cas de test
 
@@ -51,18 +77,15 @@ Chaque scénario a un test TypeScript dont le titre commence par son numéro, pa
 |---|---|---|
 | C : se connecter | C1–C14 | [tests/connexion.spec.ts](tests/connexion.spec.ts) |
 | A : ouvrir une page sans être connecté | A1–A7 | [tests/acces.spec.ts](tests/acces.spec.ts) |
-| T : trier le catalogue | T1–T5 | [tests/tri.spec.ts](tests/tri.spec.ts) |
+| T : trier le catalogue | T1–T7 | [tests/tri.spec.ts](tests/tri.spec.ts) |
 | F : consulter une fiche produit | F1–F7 | [tests/fiche.spec.ts](tests/fiche.spec.ts) |
 | P : gérer le panier | P1–P16 | [tests/panier.spec.ts](tests/panier.spec.ts) |
 | CMD : passer une commande | CMD1–CMD12, CMD14–CMD16 | [tests/commande.spec.ts](tests/commande.spec.ts) |
 
 Comme le prévoit la stratégie, A7 et les tâches T, F, P et CMD sont jouées avec les 5 comptes
 (`standard_user`, `problem_user`, `error_user`, `visual_user`, `performance_glitch_user`), soit
-240 tests en tout. Les tests qui échouent à cause d'un défaut du site ou d'un compte défectueux
-sont listés dans [tests/support/accounts.ts](tests/support/accounts.ts) et marqués `test.fail` :
-Playwright compte leur échec comme attendu, et signale le jour où l'un d'eux se met à passer.
-
-Le seul scénario « à confirmer » (CMD8) porte l'étiquette `@a-confirmer`.
+250 tests en tout. Chaque test vérifie le résultat normal, quel que soit le compte : avec les
+comptes défectueux et pour les défauts du site, il échoue et apparaît en rouge dans le rapport.
 
 ### Lancer les tests
 
@@ -79,9 +102,10 @@ npm run test:report
   tâche : `npm run test:headed -- tests/panier.spec.ts`.
 - `npm run test:ui` ouvre l'interface de Playwright, où l'on choisit les tests à lancer et où
   l'on revoit chaque étape.
-- `npx playwright test --grep @a-confirmer` ne lance que les scénarios « à confirmer ».
 
 `npm test` utilise le navigateur Google Chrome installé sur le poste (`channel: 'chrome'`).
+Tant que le site a des défauts, `npm test` se termine en échec : les tests en échec attendus
+sont listés dans « Défauts du site » et « Résultats par compte ».
 
 ### Données de test
 
@@ -95,7 +119,7 @@ de connexion du site) :
 | `problem_user` | compte défectueux : des échecs sont attendus |
 | `error_user` | compte défectueux : des échecs sont attendus |
 | `visual_user` | compte défectueux : des échecs sont attendus |
-| `performance_glitch_user` | compte lent : voir « Ambiguïtés » |
+| `performance_glitch_user` | compte lent : tous les scénarios doivent passer |
 
 Catalogue (6 produits, identifiés par leur label et leur prix) :
 
@@ -119,8 +143,10 @@ Dans les tableaux, « connecté » veut dire connecté avec le compte testé.
 ### C : se connecter
 
 Variables : nom d'utilisateur U, mot de passe P. Ordre de contrôle du site : U vide, P vide,
-couple (U, P) inconnu, compte bloqué. Given : l'utilisateur voit la page de connexion. When :
-il saisit U et P, puis clique sur « Login ».
+couple (U, P) inconnu, compte bloqué.
+
+- Given : l'utilisateur voit la page de connexion.
+- When : il saisit U et P, puis clique sur « Login ».
 
 | n° | U | P | Then | Cas testé |
 |---|---|---|---|---|
@@ -141,9 +167,12 @@ il saisit U et P, puis clique sur « Login ».
 
 ### A : ouvrir une page sans être connecté
 
-Given : l'utilisateur n'est pas connecté. When : il ouvre directement l'adresse. Then : il voit
-la page de connexion avec le message « Epic sadface: You can only access '<chemin>' when you are
-logged in. ». Les 6 pages protégées sont toutes testées (domaine petit).
+- Given : l'utilisateur n'est pas connecté.
+- When : il ouvre directement l'adresse.
+- Then : il voit la page de connexion avec le message « Epic sadface: You can only access
+  '<chemin>' when you are logged in. ».
+
+Les 6 pages protégées sont toutes testées.
 
 | n° | Adresse ouverte | Chemin dans le message | Cas testé |
 |---|---|---|---|
@@ -157,8 +186,12 @@ logged in. ». Les 6 pages protégées sont toutes testées (domaine petit).
 
 ### T : trier le catalogue
 
-Given : connecté, page « Products ». When : il choisit l'option de tri. Les 4 options sont
-testées.
+- Given : connecté, page « Products ».
+- When : il choisit l'option de tri.
+
+Les 4 options sont testées. Pour T5 à T7, il ouvre ensuite la fiche du premier produit et
+clique sur « Back to products » ; « Name (A to Z) » n'est pas testé ainsi car c'est déjà le tri
+par défaut.
 
 | n° | Option | Then | Cas testé |
 |---|---|---|---|
@@ -166,11 +199,15 @@ testées.
 | T2 | « Name (Z to A) » | l'ordre inverse de T1 | ordre alphabétique inverse |
 | T3 | « Price (low to high) » | prix dans l'ordre $7.99, $9.99, $15.99, $15.99, $29.99, $49.99 ; premier « Sauce Labs Onesie » ($7.99), dernier « Sauce Labs Fleece Jacket » ($49.99) | limite : deux produits au même prix, leur ordre entre eux n'est pas vérifié |
 | T4 | « Price (high to low) » | prix dans l'ordre $49.99, $29.99, $15.99, $15.99, $9.99, $7.99 | ordre décroissant |
-| T5 | « Price (low to high) », puis clic sur « Sauce Labs Onesie » ($7.99) et « Back to products » | le tri affiché est toujours « Price (low to high) » et le premier produit est « Sauce Labs Onesie » ($7.99) | le tri est conservé après une fiche |
+| T5 | « Price (low to high) », puis fiche de « Sauce Labs Onesie » ($7.99) et « Back to products » | le tri affiché est toujours « Price (low to high) » et le premier produit est « Sauce Labs Onesie » ($7.99) | le tri est conservé après une fiche |
+| T6 | « Name (Z to A) », puis fiche de « Test.allTheThings() T-Shirt (Red) » ($15.99) et « Back to products » | le tri affiché est toujours « Name (Z to A) » et le premier produit est « Test.allTheThings() T-Shirt (Red) » ($15.99) | le tri est conservé après une fiche |
+| T7 | « Price (high to low) », puis fiche de « Sauce Labs Fleece Jacket » ($49.99) et « Back to products » | le tri affiché est toujours « Price (high to low) » et le premier produit est « Sauce Labs Fleece Jacket » ($49.99) | le tri est conservé après une fiche |
 
 ### F : consulter une fiche produit
 
-Les identifiants valides vont de 0 à 5. Given : connecté.
+Les identifiants valides vont de 0 à 5.
+
+- Given : connecté.
 
 | n° | When | Then | Cas testé |
 |---|---|---|---|
@@ -182,14 +219,15 @@ Les identifiants valides vont de 0 à 5. Given : connecté.
 | F6 | ouvrir `/inventory-item.html?id=abc` | titre « ITEM NOT FOUND » | valeur non numérique |
 | F7 | ouvrir `/inventory-item.html?id=99` | titre « ITEM NOT FOUND » | valeur franchement hors limite |
 
-Pour F4 à F7, le site affiche aussi le prix « $√-1 » et un faux message de répondeur
-téléphonique comme description.
+Pour F4 à F7, le site affiche aussi le prix « $√-1 ».
 
 ### P : gérer le panier
 
 Variables : action (ajouter ou retirer), lieu (catalogue, fiche ou page panier), nombre de
 produits n avant l'action (classes 0, 1, 2 à 5, 6). Un produit ne peut être dans le panier
-qu'une fois. Given : connecté, avec le panier indiqué.
+qu'une fois.
+
+- Given : connecté, avec le panier indiqué.
 
 | n° | Panier avant | When | Then | Cas testé |
 |---|---|---|---|---|
@@ -212,11 +250,12 @@ qu'une fois. Given : connecté, avec le panier indiqué.
 
 ### CMD : passer une commande
 
-Given : connecté, le panier contient « Sauce Labs Backpack » ($29.99) sauf mention contraire.
+- Given : connecté, le panier contient « Sauce Labs Backpack » ($29.99) sauf mention contraire.
 
 Formulaire « Checkout: Your Information ». Variables : prénom, nom, code postal. Ordre de
-contrôle du site : prénom, nom, code postal. When : il remplit les champs et clique sur
-« Continue ».
+contrôle du site : prénom, nom, code postal.
+
+- When : il remplit les champs et clique sur « Continue ».
 
 | n° | Prénom | Nom | Code postal | Then | Cas testé |
 |---|---|---|---|---|---|
@@ -227,10 +266,11 @@ contrôle du site : prénom, nom, code postal. When : il remplit les champs et c
 | CMD5 | `Jean` | `Dupont` | vide | « Error: Postal Code is required » | code postal vide |
 | CMD6 | `J` | `D` | `3` | « Checkout: Overview » | limite : un seul caractère |
 | CMD7 | trois espaces | `Dupont` | `38000` | « Error: First Name is required » | espaces seuls |
-| CMD8 (à confirmer) | `Jean` | `Dupont` | `abc` | « Checkout: Overview » (comportement actuel) | code postal non numérique |
+| CMD8 | `Jean` | `Dupont` | `abc` | « Checkout: Overview » | code postal non numérique (référence : `standard_user`) |
 
-Montants du récapitulatif « Checkout: Overview ». Variable : contenu du panier. When : il clique
-sur « Checkout », remplit le formulaire et clique sur « Continue ».
+Montants du récapitulatif « Checkout: Overview ». Variable : contenu du panier.
+
+- When : il clique sur « Checkout », remplit le formulaire et clique sur « Continue ».
 
 | n° | Panier | Then | Cas testé |
 |---|---|---|---|
@@ -253,33 +293,24 @@ Ces tests vérifient le comportement attendu et échouent avec tous les comptes 
 
 | n° | Attendu | Comportement actuel du site |
 |---|---|---|
-| T5 | le tri choisi est conservé au retour d'une fiche | le tri revient à « Name (A to Z) » |
+| T5 à T7 | le tri choisi est conservé au retour d'une fiche | le tri revient à « Name (A to Z) » |
 | P16 | après « Reset App State », les boutons redeviennent « Add to cart » | les boutons restent sur « Remove » jusqu'au rechargement de la page |
 | CMD7 | un prénom fait seulement d'espaces est refusé | le récapitulatif s'affiche |
 
 ### Résultats par compte
 
-Résultats d'une exécution complète de la suite (240 tests, 24/11/2026), dans Chromium et dans
-Firefox : tous les tests ont eu le résultat attendu, avec les mêmes échecs dans les deux.
+Résultats d'une exécution complète de la suite (250 tests, 24/11/2026) : 176 tests passent et
+74 échouent, avec les mêmes échecs dans Chromium et dans Firefox.
 
 | Compte | Tests en échec |
 |---|---|
-| `standard_user` | les 3 défauts du site |
-| `performance_glitch_user` | les 3 défauts du site. Le compte est lent (environ 5,5 s par affichage du catalogue, contre 0,6 s avec `standard_user`) mais passe tous les autres tests. |
-| `visual_user` | les 3 défauts du site, plus T1 à T4 : les prix du catalogue sont tirés au hasard à chaque affichage. |
-| `problem_user` | les 3 défauts du site, plus T2 à T4, F1, P2 à P9, P11, P12, P15, CMD1, CMD5, CMD6, CMD8 à CMD12, CMD14, CMD16. Le tri ne change pas l'ordre ; cliquer sur un nom ouvre une autre fiche ; seuls « Sauce Labs Backpack » ($29.99), « Sauce Labs Bike Light » ($9.99) et « Sauce Labs Onesie » ($7.99) peuvent être ajoutés, et « Remove » ne retire pas toujours le produit ; dans le formulaire, le texte tapé dans le nom s'écrit dans le prénom, ce qui bloque les commandes. |
-| `error_user` | les 3 défauts du site, plus T2 à T4, F1, P2 à P4, P6 à P9, P11, P12, P15, CMD3, CMD4, CMD10 à CMD12, CMD14. Le tri affiche l'alerte « Sorting is broken! This error has been reported to Backtrace. » ; « Sauce Labs Bolt T-Shirt » ($15.99) et « Sauce Labs Fleece Jacket » ($49.99) ne peuvent pas être ajoutés ; les fiches n'ont pas de description ; le nom vide n'est pas signalé ; « Finish » ne termine pas la commande. |
-
-### Ambiguïtés de la spécification
-
-CMD8 : le code postal doit-il avoir un format (chiffres seulement, longueur) ? En attendant la
-réponse, le test vérifie le comportement actuel : `abc` est accepté.
+| `standard_user` | les tests des défauts du site (T5 à T7, P16, CMD7) |
+| `performance_glitch_user` | les tests des défauts du site (T5 à T7, P16, CMD7). Le compte est lent (environ 5,5 s par affichage du catalogue, contre 0,6 s avec `standard_user`) mais passe tous les autres tests. |
+| `visual_user` | les tests des défauts du site (T5 à T7, P16, CMD7), plus T1 à T4 : les prix du catalogue sont tirés au hasard à chaque affichage. |
+| `problem_user` | les tests des défauts du site (T5 à T7, P16, CMD7), plus T2 à T4, F1, P2 à P9, P11, P12, P15, CMD1, CMD5, CMD6, CMD8 à CMD12, CMD14, CMD16. Le tri ne change pas l'ordre ; cliquer sur un nom ouvre une autre fiche ; seuls « Sauce Labs Backpack » ($29.99), « Sauce Labs Bike Light » ($9.99) et « Sauce Labs Onesie » ($7.99) peuvent être ajoutés, et « Remove » ne retire pas toujours le produit ; dans le formulaire, le texte tapé dans le nom s'écrit dans le prénom, ce qui bloque les commandes. |
+| `error_user` | les tests des défauts du site (T5 à T7, P16, CMD7), plus T2 à T4, F1, P2 à P4, P6 à P9, P11, P12, P15, CMD3, CMD4, CMD10 à CMD12, CMD14. Le tri affiche l'alerte « Sorting is broken! This error has been reported to Backtrace. » ; « Sauce Labs Bolt T-Shirt » ($15.99) et « Sauce Labs Fleece Jacket » ($49.99) ne peuvent pas être ajoutés ; les fiches n'ont pas de description ; le nom vide n'est pas signalé ; « Finish » ne termine pas la commande. |
 
 ## DSL de test
-
-Le DSL décrit ce que l'utilisateur **fait** (actions) et ce qu'il **voit** (perceptions), avec
-le vocabulaire de l'interface. Les tests n'utilisent que le DSL et ne parlent jamais de
-sélecteurs ni de code HTML.
 
 ### Concepts
 
@@ -352,7 +383,7 @@ Perceptions :
 
 - `getPerceivedProducts(): Promise<Product[]>` : les produits de la liste affichée, dans
   l'ordre de l'écran. Sert pour le catalogue, le panier et le récapitulatif de commande.
-- `getPerceivedSortOption(): Promise<SortOption>` : le tri affiché (T1, T5).
+- `getPerceivedSortOption(): Promise<SortOption>` : le tri affiché (T1, T5 à T7).
 - `getPerceivedProductDetails(): Promise<ProductDetails>` : la fiche ouverte (F1 à F7).
 
 ### Tâche P : gérer le panier
@@ -433,18 +464,18 @@ fois.
   vérifications sont dans les tests, avec `expect.poll(() => app.getPerceivedCartBadge())`,
   qui relit l'écran jusqu'à obtenir la valeur attendue ou jusqu'au délai maximal.
 - **Les comptes** : `forEachAccount` ([tests/support/accounts.ts](tests/support/accounts.ts))
-  rejoue un groupe de scénarios avec chaque compte, après une connexion avec ce compte. La
-  liste `SITE_DEFECTS` donne les défauts du site, communs à tous les comptes, et
-  `KNOWN_FAILURES` les échecs propres à chaque compte ; ces tests sont marqués `test.fail`.
-- **Les listes sont lues en une seule fois** (`getPerceivedProducts`) : lue produit par
-  produit, une liste peut changer de page en cours de lecture et bloquer `expect.poll`.
+  rejoue un groupe de scénarios avec chaque compte, après une connexion avec ce compte. Les
+  tests sont les mêmes pour tous les comptes.
+- **Les perceptions lisent l'écran sans attendre** : la liste des produits est lue en une
+  seule fois, et un texte absent donne `null` au lieu de faire attendre. Sinon, une lecture
+  faite pendant un changement de page peut bloquer `expect.poll` jusqu'à son délai.
 - **Les alertes du navigateur** sont enregistrées dès la création de la classe, puis fermées,
   pour que le test continue et que `getPerceivedAlerts()` puisse les lire.
 - **Configuration** ([playwright.config.ts](playwright.config.ts)) : `baseURL` vaut
   `https://www.saucedemo.com`. Deux projets : `chrome` (Google Chrome installé sur le poste,
   car le Chromium fourni par Playwright est bloqué sur un de nos postes) et `firefox` (le
-  Firefox fourni par Playwright). Les vérifications attendent
-  jusqu'à 10 s, à cause de la lenteur de `performance_glitch_user`.
+  Firefox fourni par Playwright). Les vérifications attendent jusqu'à 10 s, à cause de la
+  lenteur de `performance_glitch_user`.
 
 ## Outillage et usage de l'IA
 
@@ -459,13 +490,16 @@ fois.
 
 | Partie | Auteur |
 |---|---|
-| Premiers scénarios Given / When / Then des tâches C, A, T, F, P et CMD | nous |
-| Stratégie, réorganisation en tâches C, A, T, F, P, CMD, classes d'équivalence et valeurs limites | nous |
-| Retrait depuis le catalogue et la fiche (P7, P9, P11) | idée de notre part, rédaction par l'IA |
-| Cas limites (C9 à C12, C14, A2 à A6, T5, F4 à F7, P14 à P16, CMD7, CMD8) et défauts des comptes | proposés par l'IA, puis vérifiés par l'IA sur le site avec un script Playwright |
+| Premiers scénarios Given / When / Then (ajout et retrait de produits du panier) | nous |
 | Premières fonctions du DSL (`addToCart`, `removeFromCart`, `getPerceivedProducts`) | nous |
+| Exigences sur les scénarios : données réelles du site, produits identifiés par label et prix, tests indépendants du compte | nous |
+| Stratégie et découpage en tâches C, A, T, F, P, CMD | décidés par nous, rédigés avec l'IA |
+| Scénarios des tableaux (classes d'équivalence, valeurs limites) | proposés par l'IA, relus et corrigés par nous |
+| Retrait depuis le catalogue et la fiche (P7, P9, P11) | idée de notre part, rédaction par l'IA |
+| Cas limites (C9 à C12, C14, A2 à A6, T5 à T7, F4 à F7, P14 à P16, CMD7, CMD8) et défauts des comptes | quelques cas donnés par nous ; nous avons demandé à l'IA de trouver les autres, puis l'IA les a vérifiés sur le site avec un script Playwright |
+| Résultat attendu dans les cas non spécifiés, choix des tests à garder ou à supprimer | nous |
 | Reste du DSL (types, actions, perceptions, stratégie d'implémentation) | l'IA |
-| Code : configuration, classe `SauceDemo`, tests, liste des échecs observés par compte | l'IA |
+| Code : configuration, classe `SauceDemo`, tests, liste des échecs par compte, correction des tests instables | l'IA |
 
 Pour les cas limites et pour les échecs par compte, l'IA a ouvert le site avec Playwright
 pour observer son comportement réel. La liste des échecs par compte vient de ces observations ;
@@ -475,21 +509,17 @@ elle a ensuite été confirmée en lançant les tests.
 
 En substance, dans l'ordre :
 
-1. « Fais-moi juste les cas de test Given / When / Then du site avant de faire autre chose. »
-2. « On peut retirer du panier les produits achetés, mais on peut aussi les supprimer depuis la
-   page des produits avec le bouton Remove, et les boutons changent après l'ajout d'un produit
-   au panier. Je pense que ces cas sont intéressants. »
+1. « Écris les cas de test Given / When / Then du site avant de faire autre chose. »
+2. « Ajoute les cas de retrait depuis la page des produits avec le bouton Remove, et le
+   changement des boutons après l'ajout d'un produit au panier. »
 3. « Est-ce qu'il reste des cas limites à ajouter qui ne sont pas courants ? », puis le choix
    de les vérifier d'abord sur le site avant de les écrire.
 4. « Complète le DSL. »
 5. « Écris les tests Playwright à partir de nos scénarios et du DSL, et indique dans le README
    ce qui est fait par l'IA et ce qui est fait par nous. »
-6. « Teste avec le navigateur : lance le projet au lieu de tout faire dans le terminal. »
-7. Après la nouvelle version des scénarios par classes d'équivalence : fusionner les deux
-   versions du README et adapter les tests aux nouveaux scénarios et à tous les comptes.
 
 ### Utilisation d'agents
 
-Claude Code a travaillé comme un agent : il a lancé lui-même des commandes (installation de
-Playwright, scripts d'observation du site, lancement des tests) et corrigé le
-code d'après les résultats. Aucun autre agent n'a été utilisé.
+Claude Code a travaillé comme un agent : il a lancé lui-même des commandes (scripts
+d'observation du site, lancement des tests) et corrigé le code d'après les résultats. Aucun
+autre agent n'a été utilisé.
